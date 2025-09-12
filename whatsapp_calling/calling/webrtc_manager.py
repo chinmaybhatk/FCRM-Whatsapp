@@ -9,9 +9,9 @@ from frappe.utils import now_datetime, cstr
 
 class WebRTCManager:
     def __init__(self):
-        self.janus_settings = frappe.get_single("Janus WebRTC Settings")
-        if not self.janus_settings or not self.janus_settings.is_enabled:
-            frappe.throw("Janus WebRTC Settings not configured or disabled")
+        self.mediasoup_settings = frappe.get_single("MediaSoup WebRTC Settings")
+        if not self.mediasoup_settings or not self.mediasoup_settings.is_enabled:
+            frappe.throw("MediaSoup WebRTC Settings not configured or disabled")
     
     def initiate_call(self, to_number, from_agent, lead_id=None):
         """Initiate a WebRTC call to WhatsApp number"""
@@ -35,8 +35,8 @@ class WebRTCManager:
             call_log.insert(ignore_permissions=True)
             frappe.db.commit()
             
-            # Request WebRTC session from Janus
-            session_data = self.create_janus_session(session_id, from_agent, to_number)
+            # Request WebRTC session from MediaSoup
+            session_data = self.create_mediasoup_session(session_id, from_agent, to_number)
             
             if session_data:
                 # Update call log with session data
@@ -60,31 +60,33 @@ class WebRTCManager:
             frappe.logger().error(f"Error initiating call: {str(e)}")
             frappe.throw(f"Failed to initiate call: {str(e)}")
     
-    def create_janus_session(self, session_id, caller_id, callee_id):
-        """Create WebRTC session via Janus Gateway"""
+    def create_mediasoup_session(self, session_id, caller_id, callee_id):
+        """Create WebRTC session via MediaSoup"""
         try:
-            # Create Janus session
-            janus_session_id = self.janus_settings.create_janus_session()
-            if not janus_session_id:
-                return None
+            # Generate unique session ID for MediaSoup
+            mediasoup_session_id = frappe.generate_hash()
             
             # Get ICE servers configuration
-            ice_servers = self.janus_settings.get_ice_servers()
+            ice_servers = self.mediasoup_settings.get_ice_servers()
+            
+            # Get MediaSoup configuration
+            config = self.mediasoup_settings.get_mediasoup_config()
             
             # Generate session token
             session_token = self.get_call_token(session_id, caller_id)
             
             return {
-                "session_id": janus_session_id,
+                "session_id": mediasoup_session_id,
                 "ice_servers": ice_servers,
                 "session_token": session_token,
-                "server_url": self.janus_settings.janus_server_url,
-                "api_secret": self.janus_settings.janus_api_secret,
-                "recording_enabled": self.janus_settings.recording_enabled
+                "server_host": config["server_host"],
+                "server_port": config["server_port"],
+                "recording_enabled": config["recording_enabled"],
+                "mediasoup_config": config
             }
                 
         except Exception as e:
-            frappe.logger().error(f"Error creating Janus session: {str(e)}")
+            frappe.logger().error(f"Error creating MediaSoup session: {str(e)}")
             return None
     
     def end_call(self, session_id, end_reason="user_hangup"):
@@ -96,7 +98,7 @@ class WebRTCManager:
                 call_doc = frappe.get_doc("WhatsApp Call Log", call_log)
                 call_doc.end_call(end_reason)
             
-            # Janus session cleanup will be handled by frontend
+            # MediaSoup session cleanup will be handled by frontend
             return True
             
         except Exception as e:
@@ -114,8 +116,8 @@ class WebRTCManager:
                 "sub": user_id
             }
             
-            # Use Janus API secret as JWT secret
-            jwt_secret = self.janus_settings.janus_api_secret or "default-secret"
+            # Use MediaSoup session secret as JWT secret
+            jwt_secret = "mediasoup-" + frappe.generate_hash(length=16)
             token = jwt.encode(
                 payload,
                 jwt_secret,
@@ -129,9 +131,9 @@ class WebRTCManager:
             return None
     
     def get_ice_servers(self):
-        """Get ICE servers configuration from Janus settings"""
+        """Get ICE servers configuration from MediaSoup settings"""
         try:
-            return self.janus_settings.get_ice_servers()
+            return self.mediasoup_settings.get_ice_servers()
                 
         except Exception as e:
             frappe.logger().error(f"Error getting ICE servers: {str(e)}")
@@ -158,7 +160,7 @@ class WebRTCManager:
     def get_session_quality(self, session_id):
         """Get real-time quality metrics for a session"""
         try:
-            # Quality metrics will be handled by frontend Janus client
+            # Quality metrics will be handled by frontend MediaSoup client
             # Return default quality data for now
             return {
                 "audio_quality": "good",
@@ -193,7 +195,7 @@ class WebRTCManager:
         return account and account.tier in ["Professional", "Enterprise"]
     
     def handle_call_event(self, event_data):
-        """Handle incoming call events from Janus Gateway"""
+        """Handle incoming call events from MediaSoup"""
         try:
             session_id = event_data.get("session_id")
             event_type = event_data.get("event_type")

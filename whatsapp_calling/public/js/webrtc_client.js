@@ -1,27 +1,44 @@
 class WhatsAppWebRTCClient {
     constructor() {
-        this.janus = null;
-        this.janusSession = null;
-        this.videocallHandle = null;
-        this.localStream = null;
+        this.device = null;
         this.socket = io('/whatsapp-calling');
         this.currentCall = null;
         this.isCallActive = false;
-        this.janusConfig = null;
+        this.localStream = null;
+        this.sendTransport = null;
+        this.recvTransport = null;
+        this.producer = null;
+        this.consumer = null;
+        this.mediasoupConfig = null;
         
         this.bindEvents();
-        this.initJanus();
+        this.initMediaSoup();
     }
     
     bindEvents() {
-        // Socket.IO event listeners
+        // Socket.IO event listeners for signaling
         this.socket.on('call:incoming', (data) => this.handleIncomingCall(data));
         this.socket.on('call:answered', (data) => this.handleCallAnswered(data));
         this.socket.on('call:ended', (data) => this.handleCallEnded(data));
-        this.socket.on('call:offer', (data) => this.handleOffer(data));
-        this.socket.on('call:answer', (data) => this.handleAnswer(data));
-        this.socket.on('call:ice-candidate', (data) => this.handleIceCandidate(data));
+        this.socket.on('transport-connect', (data) => this.handleTransportConnect(data));
+        this.socket.on('transport-produce', (data) => this.handleTransportProduce(data));
+        this.socket.on('new-consumer', (data) => this.handleNewConsumer(data));
         this.socket.on('call:quality-update', (data) => this.handleQualityUpdate(data));
+    }
+    
+    async initMediaSoup() {
+        if (typeof mediasoupClient === 'undefined') {
+            console.error('MediaSoup client library not loaded');
+            return;
+        }
+        
+        try {
+            // Create MediaSoup device
+            this.device = new mediasoupClient.Device();
+            console.log('MediaSoup device created successfully');
+        } catch (error) {
+            console.error('Error creating MediaSoup device:', error);
+        }
     }
     
     async initiateCall(phoneNumber, leadId = null) {
@@ -40,8 +57,10 @@ class WhatsAppWebRTCClient {
             
             if (response.message.success) {
                 this.currentCall = response.message;
-                await this.setupJanusConnection();
-                await this.makeCall(phoneNumber);
+                this.mediasoupConfig = response.message.mediasoup_config;
+                
+                await this.setupMediaSoupConnection();
+                await this.startCall(phoneNumber);
                 return true;
             } else {
                 this.showError('Failed to initiate call');
@@ -55,95 +74,59 @@ class WhatsAppWebRTCClient {
         }
     }
     
-    async initJanus() {
-        if (typeof Janus === 'undefined') {
-            console.error('Janus library not loaded');
-            return;
-        }
-        
-        Janus.init({
-            debug: "all",
-            callback: () => {
-                console.log('Janus initialized successfully');
-            }
-        });
-    }
-    
-    async setupJanusConnection() {
+    async setupMediaSoupConnection() {
         try {
-            // Get Janus configuration
+            // Get MediaSoup configuration from server
             const response = await frappe.call({
-                method: 'whatsapp_calling.whatsapp_calling.doctype.janus_webrtc_settings.api.get_janus_config'
+                method: 'whatsapp_calling.whatsapp_calling.doctype.mediasoup_webrtc_settings.api.get_mediasoup_config'
             });
             
-            this.janusConfig = response.message;
+            this.mediasoupConfig = response.message;
             
-            // Create Janus instance
-            this.janus = new Janus({
-                server: this.janusConfig.server_url,
-                apisecret: this.janusConfig.api_secret,
-                iceServers: this.janusConfig.ice_servers,
-                success: () => {
-                    console.log('Janus connection successful');
-                    this.attachVideoCallPlugin();
-                },
-                error: (error) => {
-                    console.error('Janus connection error:', error);
-                    this.showError('Failed to connect to Janus server');
-                },
-                destroyed: () => {
-                    console.log('Janus connection destroyed');
-                }
-            });
+            // Get router RTP capabilities from server
+            const rtpCapabilities = await this.getRtpCapabilities();
+            
+            // Load the device with RTP capabilities
+            if (!this.device.loaded) {
+                await this.device.load({ routerRtpCapabilities: rtpCapabilities });
+                console.log('MediaSoup device loaded with RTP capabilities');
+            }
             
         } catch (error) {
-            console.error('Error setting up Janus:', error);
+            console.error('Error setting up MediaSoup:', error);
             this.showError('Failed to setup call connection');
         }
     }
     
-    async attachVideoCallPlugin() {
-        this.janus.attach({
-            plugin: "janus.plugin.videocall",
-            opaqueId: "videocall-" + Janus.randomString(12),
-            success: (pluginHandle) => {
-                this.videocallHandle = pluginHandle;
-                console.log('VideoCall plugin attached:', pluginHandle.getPlugin());
-            },
-            error: (error) => {
-                console.error('Error attaching VideoCall plugin:', error);
-                this.showError('Failed to initialize call plugin');
-            },
-            onmessage: (msg, jsep) => {
-                this.handleJanusMessage(msg, jsep);
-            },
-            onlocalstream: (stream) => {
-                console.log('Local stream received');
-                this.localStream = stream;
-            },
-            onremotestream: (stream) => {
-                console.log('Remote stream received');
-                const remoteAudio = document.getElementById('remoteAudio');
-                if (remoteAudio) {
-                    Janus.attachMediaStream(remoteAudio, stream);
+    async getRtpCapabilities() {
+        // In a real implementation, this would come from the MediaSoup server
+        // For now, return default audio capabilities
+        return {
+            codecs: [
+                {
+                    kind: 'audio',
+                    mimeType: 'audio/opus',
+                    clockRate: 48000,
+                    channels: 2,
+                    parameters: {
+                        'useinbandfec': 1,
+                        'usedtx': 1
+                    }
                 }
-                this.updateCallStatus('connected');
-            },
-            oncleanup: () => {
-                console.log('VideoCall plugin cleanup');
-                this.cleanup();
-            }
-        });
+            ],
+            headerExtensions: [
+                {
+                    kind: 'audio',
+                    uri: 'urn:ietf:params:rtp-hdrext:ssrc-audio-level',
+                    preferredId: 1
+                }
+            ]
+        };
     }
     
-    async makeCall(username) {
-        if (!this.videocallHandle) {
-            this.showError('Call plugin not ready');
-            return;
-        }
-        
-        // Get user media first
+    async startCall(phoneNumber) {
         try {
+            // Get user media (audio only)
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     echoCancellation: true,
@@ -152,96 +135,170 @@ class WhatsAppWebRTCClient {
                 },
                 video: false
             });
+            
+            // Create send transport
+            await this.createSendTransport();
+            
+            // Create receive transport
+            await this.createRecvTransport();
+            
+            // Produce audio
+            await this.produce();
+            
+            // Update UI
+            this.updateCallStatus('connecting');
+            
         } catch (error) {
-            console.error('Error getting user media:', error);
-            this.showError('Failed to access microphone');
-            return;
+            console.error('Error starting call:', error);
+            this.showError('Failed to start call');
         }
-        
-        // Register username and make call
-        const register = {
-            request: "register",
-            username: frappe.session.user
+    }
+    
+    async createSendTransport() {
+        // Get transport options from server (in real implementation)
+        const transportOptions = {
+            id: frappe.utils.get_random(10),
+            iceParameters: {
+                usernameFragment: frappe.utils.get_random(4),
+                password: frappe.utils.get_random(24),
+                iceLite: true
+            },
+            iceCandidates: [],
+            dtlsParameters: {
+                role: 'auto',
+                fingerprints: [
+                    {
+                        algorithm: 'sha-256',
+                        value: '00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00'
+                    }
+                ]
+            }
         };
         
-        this.videocallHandle.send({
-            message: register,
-            success: () => {
-                console.log('Registered with Janus');
-                // Now make the call
-                const call = {
-                    request: "call",
-                    username: username
-                };
-                
-                this.videocallHandle.send({
-                    message: call,
-                    media: {
-                        audioSend: true,
-                        audioRecv: true,
-                        videoSend: false,
-                        videoRecv: false
-                    },
-                    stream: this.localStream,
-                    success: (jsep) => {
-                        console.log('Call initiated', jsep);
-                    },
-                    error: (error) => {
-                        console.error('Error making call:', error);
-                        this.showError('Failed to make call');
-                    }
+        this.sendTransport = this.device.createSendTransport(transportOptions);
+        
+        this.sendTransport.on('connect', async ({ dtlsParameters }, callback, errback) => {
+            try {
+                // Signal transport connect to server
+                this.socket.emit('transport-connect', {
+                    transportId: this.sendTransport.id,
+                    dtlsParameters: dtlsParameters
                 });
-            },
-            error: (error) => {
-                console.error('Error registering:', error);
-                this.showError('Failed to register for calling');
+                callback();
+            } catch (error) {
+                errback(error);
+            }
+        });
+        
+        this.sendTransport.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
+            try {
+                // Signal produce to server
+                this.socket.emit('transport-produce', {
+                    transportId: this.sendTransport.id,
+                    kind: kind,
+                    rtpParameters: rtpParameters,
+                    appData: appData
+                });
+                
+                // Server would respond with producer ID
+                const producerId = frappe.utils.get_random(10);
+                callback({ id: producerId });
+            } catch (error) {
+                errback(error);
             }
         });
     }
     
-    handleJanusMessage(msg, jsep) {
-        console.log('Janus message received:', msg);
-        
-        const event = msg['videocall'];
-        if (event) {
-            if (event === 'event') {
-                const result = msg['result'];
-                if (result && result['event']) {
-                    const eventType = result['event'];
-                    
-                    switch (eventType) {
-                        case 'registered':
-                            console.log('Successfully registered');
-                            break;
-                        case 'calling':
-                            this.updateCallStatus('connecting');
-                            break;
-                        case 'accepted':
-                            console.log('Call accepted');
-                            if (jsep) {
-                                this.videocallHandle.handleRemoteJsep({ jsep: jsep });
-                            }
-                            break;
-                        case 'hangup':
-                            console.log('Call ended');
-                            this.updateCallStatus('disconnected');
-                            break;
+    async createRecvTransport() {
+        // Similar to send transport but for receiving
+        const transportOptions = {
+            id: frappe.utils.get_random(10),
+            iceParameters: {
+                usernameFragment: frappe.utils.get_random(4),
+                password: frappe.utils.get_random(24),
+                iceLite: true
+            },
+            iceCandidates: [],
+            dtlsParameters: {
+                role: 'auto',
+                fingerprints: [
+                    {
+                        algorithm: 'sha-256',
+                        value: '00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00'
                     }
-                }
+                ]
             }
-        }
+        };
         
-        if (jsep) {
-            console.log('Handling remote JSEP:', jsep);
-            this.videocallHandle.handleRemoteJsep({ jsep: jsep });
+        this.recvTransport = this.device.createRecvTransport(transportOptions);
+        
+        this.recvTransport.on('connect', async ({ dtlsParameters }, callback, errback) => {
+            try {
+                // Signal transport connect to server
+                this.socket.emit('transport-connect', {
+                    transportId: this.recvTransport.id,
+                    dtlsParameters: dtlsParameters
+                });
+                callback();
+            } catch (error) {
+                errback(error);
+            }
+        });
+    }
+    
+    async produce() {
+        if (!this.localStream) return;
+        
+        const audioTrack = this.localStream.getAudioTracks()[0];
+        if (audioTrack) {
+            this.producer = await this.sendTransport.produce({
+                track: audioTrack,
+                codecOptions: {
+                    opusStereo: 1,
+                    opusFec: 1,
+                    opusDtx: 1,
+                    opusMaxPlaybackRate: 48000
+                }
+            });
+            
+            console.log('Audio producer created:', this.producer.id);
         }
     }
     
-    async endJanusCall() {
-        if (this.videocallHandle) {
-            const hangup = { request: "hangup" };
-            this.videocallHandle.send({ message: hangup });
+    async consume(consumerInfo) {
+        const { producerId, id, kind, rtpParameters } = consumerInfo;
+        
+        this.consumer = await this.recvTransport.consume({
+            id: id,
+            producerId: producerId,
+            kind: kind,
+            rtpParameters: rtpParameters
+        });
+        
+        // Attach remote audio
+        const remoteAudio = document.getElementById('remoteAudio');
+        if (remoteAudio && this.consumer.track) {
+            const remoteStream = new MediaStream([this.consumer.track]);
+            remoteAudio.srcObject = remoteStream;
+            this.updateCallStatus('connected');
         }
+        
+        console.log('Audio consumer created:', this.consumer.id);
+    }
+    
+    async handleTransportConnect(data) {
+        // Handle transport connection from server
+        console.log('Transport connected:', data);
+    }
+    
+    async handleTransportProduce(data) {
+        // Handle produce response from server
+        console.log('Producer created:', data);
+    }
+    
+    async handleNewConsumer(data) {
+        // Handle new consumer from server
+        await this.consume(data);
     }
     
     async endCall(endReason = 'user_hangup') {
@@ -256,8 +313,6 @@ class WhatsAppWebRTCClient {
                 });
             }
             
-            // End Janus call
-            await this.endJanusCall();
             this.cleanup();
             this.hideCallingInterface();
             
@@ -268,19 +323,33 @@ class WhatsAppWebRTCClient {
     }
     
     cleanup() {
+        // Close producer
+        if (this.producer) {
+            this.producer.close();
+            this.producer = null;
+        }
+        
+        // Close consumer
+        if (this.consumer) {
+            this.consumer.close();
+            this.consumer = null;
+        }
+        
+        // Close transports
+        if (this.sendTransport) {
+            this.sendTransport.close();
+            this.sendTransport = null;
+        }
+        
+        if (this.recvTransport) {
+            this.recvTransport.close();
+            this.recvTransport = null;
+        }
+        
+        // Stop local stream
         if (this.localStream) {
             this.localStream.getTracks().forEach(track => track.stop());
             this.localStream = null;
-        }
-        
-        if (this.videocallHandle) {
-            this.videocallHandle.detach();
-            this.videocallHandle = null;
-        }
-        
-        if (this.janus) {
-            this.janus.destroy();
-            this.janus = null;
         }
         
         this.currentCall = null;
@@ -345,7 +414,6 @@ class WhatsAppWebRTCClient {
     
     updateCallStatus(status) {
         const statusElement = $('.call-status');
-        const qualityElement = $('#call-quality');
         
         switch (status) {
             case 'connecting':
@@ -382,20 +450,17 @@ class WhatsAppWebRTCClient {
     }
     
     toggleMute() {
-        if (this.localStream) {
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            if (audioTrack) {
-                audioTrack.enabled = !audioTrack.enabled;
-                const btn = $('#mute-call-btn');
-                const icon = btn.find('i');
-                
-                if (audioTrack.enabled) {
-                    icon.removeClass('fa-microphone-slash').addClass('fa-microphone');
-                    btn.removeClass('btn-warning').addClass('btn-secondary');
-                } else {
-                    icon.removeClass('fa-microphone').addClass('fa-microphone-slash');
-                    btn.removeClass('btn-secondary').addClass('btn-warning');
-                }
+        if (this.producer && this.producer.track) {
+            this.producer.track.enabled = !this.producer.track.enabled;
+            const btn = $('#mute-call-btn');
+            const icon = btn.find('i');
+            
+            if (this.producer.track.enabled) {
+                icon.removeClass('fa-microphone-slash').addClass('fa-microphone');
+                btn.removeClass('btn-warning').addClass('btn-secondary');
+            } else {
+                icon.removeClass('fa-microphone').addClass('fa-microphone-slash');
+                btn.removeClass('btn-secondary').addClass('btn-warning');
             }
         }
     }

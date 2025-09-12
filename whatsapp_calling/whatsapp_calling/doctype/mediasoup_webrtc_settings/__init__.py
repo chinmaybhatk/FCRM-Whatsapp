@@ -1,0 +1,1 @@
+# MediaSoup WebRTC Settings DocType

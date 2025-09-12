@@ -1,0 +1,157 @@
+{
+    "actions": [],
+    "allow_rename": 1,
+    "creation": "2024-09-12 10:22:00.000000",
+    "default_view": "List",
+    "doctype": "DocType",
+    "editable_grid": 1,
+    "engine": "InnoDB",
+    "field_order": [
+        "server_host",
+        "server_port",
+        "worker_settings_section",
+        "rtc_min_port",
+        "rtc_max_port",
+        "column_break_4",
+        "is_enabled",
+        "worker_pool_size",
+        "ice_servers_section",
+        "ice_servers",
+        "announced_ip",
+        "recording_section",
+        "recording_enabled",
+        "recording_path",
+        "performance_section",
+        "max_concurrent_sessions",
+        "codec_preferences"
+    ],
+    "fields": [
+        {
+            "fieldname": "server_host",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "Server Host",
+            "reqd": 1,
+            "default": "127.0.0.1"
+        },
+        {
+            "fieldname": "server_port", 
+            "fieldtype": "Int",
+            "label": "Server Port",
+            "reqd": 1,
+            "default": "3000"
+        },
+        {
+            "fieldname": "worker_settings_section",
+            "fieldtype": "Section Break",
+            "label": "Worker Settings"
+        },
+        {
+            "fieldname": "rtc_min_port",
+            "fieldtype": "Int",
+            "label": "RTC Min Port",
+            "default": "10000"
+        },
+        {
+            "fieldname": "rtc_max_port",
+            "fieldtype": "Int", 
+            "label": "RTC Max Port",
+            "default": "10100"
+        },
+        {
+            "fieldname": "column_break_4",
+            "fieldtype": "Column Break"
+        },
+        {
+            "default": "1",
+            "fieldname": "is_enabled",
+            "fieldtype": "Check",
+            "label": "Is Enabled"
+        },
+        {
+            "fieldname": "worker_pool_size",
+            "fieldtype": "Int",
+            "label": "Worker Pool Size",
+            "default": "1"
+        },
+        {
+            "fieldname": "ice_servers_section",
+            "fieldtype": "Section Break",
+            "label": "ICE Server Configuration"
+        },
+        {
+            "fieldname": "ice_servers",
+            "fieldtype": "Code",
+            "label": "ICE Servers (JSON)",
+            "options": "JSON",
+            "default": "[\n  {\"urls\": \"stun:stun.l.google.com:19302\"},\n  {\"urls\": \"stun:stun1.l.google.com:19302\"}\n]"
+        },
+        {
+            "fieldname": "announced_ip",
+            "fieldtype": "Data",
+            "label": "Announced IP",
+            "description": "Public IP for ICE candidates (leave empty for auto-detection)"
+        },
+        {
+            "fieldname": "recording_section",
+            "fieldtype": "Section Break", 
+            "label": "Recording & Storage"
+        },
+        {
+            "default": "0",
+            "fieldname": "recording_enabled",
+            "fieldtype": "Check",
+            "label": "Enable Recording"
+        },
+        {
+            "fieldname": "recording_path",
+            "fieldtype": "Data",
+            "label": "Recording Storage Path",
+            "default": "/var/recordings"
+        },
+        {
+            "fieldname": "performance_section",
+            "fieldtype": "Section Break",
+            "label": "Performance & Codecs"
+        },
+        {
+            "default": "100",
+            "fieldname": "max_concurrent_sessions",
+            "fieldtype": "Int",
+            "label": "Max Concurrent Sessions"
+        },
+        {
+            "fieldname": "codec_preferences",
+            "fieldtype": "Code",
+            "label": "Audio Codec Preferences (JSON)",
+            "options": "JSON",
+            "default": "[\n  {\n    \"kind\": \"audio\",\n    \"mimeType\": \"audio/opus\",\n    \"clockRate\": 48000,\n    \"channels\": 2\n  },\n  {\n    \"kind\": \"audio\",\n    \"mimeType\": \"audio/PCMU\",\n    \"clockRate\": 8000\n  }\n]"
+        }
+    ],
+    "index_web_pages_for_search": 1,
+    "issingle": 1,
+    "links": [],
+    "modified": "2024-09-12 10:22:00.000000",
+    "modified_by": "Administrator",
+    "module": "WhatsApp Calling",
+    "name": "MediaSoup WebRTC Settings",
+    "naming_rule": "By fieldname",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "export": 1,
+            "print": 1,
+            "read": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 1
+}

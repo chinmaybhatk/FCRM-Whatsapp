@@ -13,6 +13,8 @@ app_version = app_version
 # Includes in <head>
 app_include_css = "/assets/whatsapp_calling/css/whatsapp_calling.css"
 app_include_js = [
+    "https://cdnjs.cloudflare.com/ajax/libs/webrtc-adapter/8.2.2/adapter.min.js",
+    "https://janus.conf.meetecho.com/janus.js",
     "/assets/whatsapp_calling/js/webrtc_client.js",
     "/assets/whatsapp_calling/js/calling_interface.js"
 ]
@@ -20,6 +22,8 @@ app_include_js = [
 # include js, css files in header of desk.html
 web_include_css = "/assets/whatsapp_calling/css/whatsapp_calling.css"
 web_include_js = [
+    "https://cdnjs.cloudflare.com/ajax/libs/webrtc-adapter/8.2.2/adapter.min.js",
+    "https://janus.conf.meetecho.com/janus.js",
     "/assets/whatsapp_calling/js/whatsapp_tab.js",
     "/assets/whatsapp_calling/js/webrtc_client.js"
 ]

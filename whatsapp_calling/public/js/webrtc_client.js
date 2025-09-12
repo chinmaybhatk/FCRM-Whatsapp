@@ -1,12 +1,16 @@
 class WhatsAppWebRTCClient {
     constructor() {
-        this.pc = null;
+        this.janus = null;
+        this.janusSession = null;
+        this.videocallHandle = null;
         this.localStream = null;
         this.socket = io('/whatsapp-calling');
         this.currentCall = null;
         this.isCallActive = false;
+        this.janusConfig = null;
         
         this.bindEvents();
+        this.initJanus();
     }
     
     bindEvents() {
@@ -36,7 +40,8 @@ class WhatsAppWebRTCClient {
             
             if (response.message.success) {
                 this.currentCall = response.message;
-                await this.setupWebRTCConnection();
+                await this.setupJanusConnection();
+                await this.makeCall(phoneNumber);
                 return true;
             } else {
                 this.showError('Failed to initiate call');
@@ -50,9 +55,95 @@ class WhatsAppWebRTCClient {
         }
     }
     
-    async setupWebRTCConnection() {
+    async initJanus() {
+        if (typeof Janus === 'undefined') {
+            console.error('Janus library not loaded');
+            return;
+        }
+        
+        Janus.init({
+            debug: "all",
+            callback: () => {
+                console.log('Janus initialized successfully');
+            }
+        });
+    }
+    
+    async setupJanusConnection() {
         try {
-            // Get user media (audio only for WhatsApp calling)
+            // Get Janus configuration
+            const response = await frappe.call({
+                method: 'whatsapp_calling.whatsapp_calling.doctype.janus_webrtc_settings.api.get_janus_config'
+            });
+            
+            this.janusConfig = response.message;
+            
+            // Create Janus instance
+            this.janus = new Janus({
+                server: this.janusConfig.server_url,
+                apisecret: this.janusConfig.api_secret,
+                iceServers: this.janusConfig.ice_servers,
+                success: () => {
+                    console.log('Janus connection successful');
+                    this.attachVideoCallPlugin();
+                },
+                error: (error) => {
+                    console.error('Janus connection error:', error);
+                    this.showError('Failed to connect to Janus server');
+                },
+                destroyed: () => {
+                    console.log('Janus connection destroyed');
+                }
+            });
+            
+        } catch (error) {
+            console.error('Error setting up Janus:', error);
+            this.showError('Failed to setup call connection');
+        }
+    }
+    
+    async attachVideoCallPlugin() {
+        this.janus.attach({
+            plugin: "janus.plugin.videocall",
+            opaqueId: "videocall-" + Janus.randomString(12),
+            success: (pluginHandle) => {
+                this.videocallHandle = pluginHandle;
+                console.log('VideoCall plugin attached:', pluginHandle.getPlugin());
+            },
+            error: (error) => {
+                console.error('Error attaching VideoCall plugin:', error);
+                this.showError('Failed to initialize call plugin');
+            },
+            onmessage: (msg, jsep) => {
+                this.handleJanusMessage(msg, jsep);
+            },
+            onlocalstream: (stream) => {
+                console.log('Local stream received');
+                this.localStream = stream;
+            },
+            onremotestream: (stream) => {
+                console.log('Remote stream received');
+                const remoteAudio = document.getElementById('remoteAudio');
+                if (remoteAudio) {
+                    Janus.attachMediaStream(remoteAudio, stream);
+                }
+                this.updateCallStatus('connected');
+            },
+            oncleanup: () => {
+                console.log('VideoCall plugin cleanup');
+                this.cleanup();
+            }
+        });
+    }
+    
+    async makeCall(username) {
+        if (!this.videocallHandle) {
+            this.showError('Call plugin not ready');
+            return;
+        }
+        
+        // Get user media first
+        try {
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     echoCancellation: true,
@@ -61,112 +152,95 @@ class WhatsAppWebRTCClient {
                 },
                 video: false
             });
-            
-            // Create peer connection
-            const config = await this.getICEConfiguration();
-            this.pc = new RTCPeerConnection(config);
-            
-            // Add local stream tracks
-            this.localStream.getTracks().forEach(track => {
-                this.pc.addTrack(track, this.localStream);
-            });
-            
-            // Handle remote stream
-            this.pc.ontrack = (event) => {
-                const remoteAudio = document.getElementById('remoteAudio');
-                if (remoteAudio) {
-                    remoteAudio.srcObject = event.streams[0];
-                }
-            };
-            
-            // Handle ICE candidates
-            this.pc.onicecandidate = (event) => {
-                if (event.candidate) {
-                    this.socket.emit('call:ice-candidate', {
-                        sessionId: this.currentCall.session_id,
-                        candidate: event.candidate
-                    });
-                }
-            };
-            
-            // Handle connection state changes
-            this.pc.onconnectionstatechange = () => {
-                this.updateCallStatus(this.pc.connectionState);
-            };
-            
-            // Create and send offer
-            const offer = await this.pc.createOffer();
-            await this.pc.setLocalDescription(offer);
-            
-            this.socket.emit('call:initiate', {
-                phoneNumber: this.currentCall.to_number,
-                sessionId: this.currentCall.session_id,
-                offer: offer
-            });
-            
         } catch (error) {
-            console.error('Error setting up WebRTC:', error);
-            this.showError('Failed to setup call connection');
+            console.error('Error getting user media:', error);
+            this.showError('Failed to access microphone');
+            return;
         }
-    }
-    
-    async getICEConfiguration() {
-        try {
-            const response = await frappe.call({
-                method: 'whatsapp_calling.calling.webrtc_manager.get_ice_servers'
-            });
-            
-            return {
-                iceServers: response.message || [
-                    { urls: 'stun:stun.l.google.com:19302' }
-                ]
-            };
-        } catch (error) {
-            console.error('Error getting ICE config:', error);
-            return {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' }
-                ]
-            };
-        }
-    }
-    
-    async handleOffer(data) {
-        try {
-            if (!this.pc) {
-                await this.setupWebRTCConnection();
+        
+        // Register username and make call
+        const register = {
+            request: "register",
+            username: frappe.session.user
+        };
+        
+        this.videocallHandle.send({
+            message: register,
+            success: () => {
+                console.log('Registered with Janus');
+                // Now make the call
+                const call = {
+                    request: "call",
+                    username: username
+                };
+                
+                this.videocallHandle.send({
+                    message: call,
+                    media: {
+                        audioSend: true,
+                        audioRecv: true,
+                        videoSend: false,
+                        videoRecv: false
+                    },
+                    stream: this.localStream,
+                    success: (jsep) => {
+                        console.log('Call initiated', jsep);
+                    },
+                    error: (error) => {
+                        console.error('Error making call:', error);
+                        this.showError('Failed to make call');
+                    }
+                });
+            },
+            error: (error) => {
+                console.error('Error registering:', error);
+                this.showError('Failed to register for calling');
             }
-            
-            await this.pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-            
-            const answer = await this.pc.createAnswer();
-            await this.pc.setLocalDescription(answer);
-            
-            this.socket.emit('call:answer', {
-                sessionId: data.sessionId,
-                answer: answer
-            });
-            
-        } catch (error) {
-            console.error('Error handling offer:', error);
-        }
+        });
     }
     
-    async handleAnswer(data) {
-        try {
-            await this.pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-        } catch (error) {
-            console.error('Error handling answer:', error);
-        }
-    }
-    
-    async handleIceCandidate(data) {
-        try {
-            if (this.pc && this.pc.remoteDescription) {
-                await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+    handleJanusMessage(msg, jsep) {
+        console.log('Janus message received:', msg);
+        
+        const event = msg['videocall'];
+        if (event) {
+            if (event === 'event') {
+                const result = msg['result'];
+                if (result && result['event']) {
+                    const eventType = result['event'];
+                    
+                    switch (eventType) {
+                        case 'registered':
+                            console.log('Successfully registered');
+                            break;
+                        case 'calling':
+                            this.updateCallStatus('connecting');
+                            break;
+                        case 'accepted':
+                            console.log('Call accepted');
+                            if (jsep) {
+                                this.videocallHandle.handleRemoteJsep({ jsep: jsep });
+                            }
+                            break;
+                        case 'hangup':
+                            console.log('Call ended');
+                            this.updateCallStatus('disconnected');
+                            break;
+                    }
+                }
             }
-        } catch (error) {
-            console.error('Error handling ICE candidate:', error);
+        }
+        
+        if (jsep) {
+            console.log('Handling remote JSEP:', jsep);
+            this.videocallHandle.handleRemoteJsep({ jsep: jsep });
+        }
+    }
+    
+    async endJanusCall() {
+        if (this.videocallHandle) {
+            const hangup = { request: "hangup" };
+            this.videocallHandle.send({ message: hangup });
         }
     }
     
@@ -182,6 +256,8 @@ class WhatsAppWebRTCClient {
                 });
             }
             
+            // End Janus call
+            await this.endJanusCall();
             this.cleanup();
             this.hideCallingInterface();
             
@@ -197,9 +273,14 @@ class WhatsAppWebRTCClient {
             this.localStream = null;
         }
         
-        if (this.pc) {
-            this.pc.close();
-            this.pc = null;
+        if (this.videocallHandle) {
+            this.videocallHandle.detach();
+            this.videocallHandle = null;
+        }
+        
+        if (this.janus) {
+            this.janus.destroy();
+            this.janus = null;
         }
         
         this.currentCall = null;

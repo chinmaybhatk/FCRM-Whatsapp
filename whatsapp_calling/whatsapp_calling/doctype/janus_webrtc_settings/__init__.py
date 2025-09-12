@@ -1,0 +1,1 @@
+# Janus WebRTC Settings DocType

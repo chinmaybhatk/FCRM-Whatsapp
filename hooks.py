@@ -1,4 +1,4 @@
-from . import __version__ as app_version
+from whatsapp_calling import __version__ as app_version
 
 app_name = "whatsapp_calling"
 app_title = "WhatsApp Business Calling"

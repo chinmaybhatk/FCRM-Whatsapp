@@ -1,25 +1,8 @@
 [build-system]
-requires = ["flit_core >=3.4,<4"]
-build-backend = "flit_core.buildapi"
-
-[project]
-name = "whatsapp_calling"
-authors = [
-    {name = "FrappeCRM", email = "admin@frappecrm.com"}
-]
-dynamic = ["version", "description"]
-readme = "README.md"
-dependencies = [
-    "requests>=2.28.0",
-    "PyJWT>=2.4.0"
-]
-
-[project.urls]
-Repository = "https://github.com/chinmaybhatk/FCRM-Whatsapp"
-"Bug Tracker" = "https://github.com/chinmaybhatk/FCRM-Whatsapp/issues"
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [tool.bench.dev-dependencies]
 coverage = "~6.5.0"
 Faker = "~13.12.1"
 pyyaml = "~5.4.1"
-semgrep = "1.45.0"

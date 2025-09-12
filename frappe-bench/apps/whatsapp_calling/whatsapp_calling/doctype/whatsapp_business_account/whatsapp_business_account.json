@@ -1,0 +1,142 @@
+{
+    "actions": [],
+    "allow_rename": 1,
+    "creation": "2024-09-12 10:22:00.000000",
+    "default_view": "List",
+    "doctype": "DocType",
+    "editable_grid": 1,
+    "engine": "InnoDB",
+    "field_order": [
+        "account_name",
+        "phone_number",
+        "phone_number_id",
+        "business_account_id",
+        "access_token",
+        "webhook_verify_token",
+        "is_active",
+        "tier",
+        "column_break_8",
+        "ai_section",
+        "enable_bot",
+        "ai_provider",
+        "claude_api_key",
+        "openai_api_key",
+        "default_lead_owner"
+    ],
+    "fields": [
+        {
+            "fieldname": "account_name",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "Account Name",
+            "reqd": 1
+        },
+        {
+            "fieldname": "phone_number",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "Phone Number",
+            "reqd": 1
+        },
+        {
+            "fieldname": "phone_number_id",
+            "fieldtype": "Data",
+            "label": "Phone Number ID",
+            "reqd": 1
+        },
+        {
+            "fieldname": "business_account_id",
+            "fieldtype": "Data",
+            "label": "Business Account ID",
+            "reqd": 1
+        },
+        {
+            "fieldname": "access_token",
+            "fieldtype": "Password",
+            "label": "Access Token",
+            "reqd": 1
+        },
+        {
+            "fieldname": "webhook_verify_token",
+            "fieldtype": "Data",
+            "label": "Webhook Verify Token"
+        },
+        {
+            "default": "0",
+            "fieldname": "is_active",
+            "fieldtype": "Check",
+            "label": "Is Active"
+        },
+        {
+            "fieldname": "tier",
+            "fieldtype": "Select",
+            "label": "Tier",
+            "options": "Free\\nProfessional\\nEnterprise",
+            "default": "Free"
+        },
+        {
+            "fieldname": "column_break_8",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "ai_section",
+            "fieldtype": "Section Break",
+            "label": "AI Bot Configuration"
+        },
+        {
+            "default": "0",
+            "fieldname": "enable_bot",
+            "fieldtype": "Check",
+            "label": "Enable AI Bot"
+        },
+        {
+            "fieldname": "ai_provider",
+            "fieldtype": "Select",
+            "label": "AI Provider",
+            "options": "claude\\nopenai",
+            "default": "claude"
+        },
+        {
+            "fieldname": "claude_api_key",
+            "fieldtype": "Password",
+            "label": "Claude API Key"
+        },
+        {
+            "fieldname": "openai_api_key",
+            "fieldtype": "Password",
+            "label": "OpenAI API Key"
+        },
+        {
+            "fieldname": "default_lead_owner",
+            "fieldtype": "Link",
+            "label": "Default Lead Owner",
+            "options": "User"
+        }
+    ],
+    "index_web_pages_for_search": 1,
+    "issingle": 1,
+    "links": [],
+    "modified": "2024-09-12 10:22:00.000000",
+    "modified_by": "Administrator",
+    "module": "WhatsApp Calling",
+    "name": "WhatsApp Business Account",
+    "naming_rule": "By fieldname",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "export": 1,
+            "print": 1,
+            "read": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 1
+}

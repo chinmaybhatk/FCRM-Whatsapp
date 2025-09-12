@@ -1,0 +1,156 @@
+{
+    "actions": [],
+    "allow_rename": 1,
+    "creation": "2024-09-12 10:22:00.000000",
+    "default_view": "List",
+    "doctype": "DocType",
+    "editable_grid": 1,
+    "engine": "InnoDB",
+    "field_order": [
+        "message_id",
+        "conversation_id",
+        "from_number",
+        "to_number",
+        "message_type",
+        "message_body",
+        "column_break_6",
+        "direction",
+        "status", 
+        "timestamp",
+        "media_url",
+        "is_bot_message",
+        "section_break_11",
+        "lead",
+        "contact",
+        "customer"
+    ],
+    "fields": [
+        {
+            "fieldname": "message_id",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "Message ID",
+            "unique": 1
+        },
+        {
+            "fieldname": "conversation_id", 
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "Conversation ID"
+        },
+        {
+            "fieldname": "from_number",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "From Number",
+            "reqd": 1
+        },
+        {
+            "fieldname": "to_number",
+            "fieldtype": "Data",
+            "in_list_view": 1, 
+            "label": "To Number",
+            "reqd": 1
+        },
+        {
+            "fieldname": "message_type",
+            "fieldtype": "Select",
+            "label": "Message Type",
+            "options": "text\\nimage\\naudio\\nvideo\\ndocument\\nlocation",
+            "default": "text"
+        },
+        {
+            "fieldname": "message_body",
+            "fieldtype": "Long Text",
+            "label": "Message Body"
+        },
+        {
+            "fieldname": "column_break_6",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "direction",
+            "fieldtype": "Select",
+            "in_list_view": 1,
+            "label": "Direction",
+            "options": "sent\\nreceived",
+            "reqd": 1
+        },
+        {
+            "fieldname": "status",
+            "fieldtype": "Select",
+            "in_list_view": 1,
+            "label": "Status",
+            "options": "sent\\ndelivered\\nread\\nfailed",
+            "reqd": 1
+        },
+        {
+            "fieldname": "timestamp",
+            "fieldtype": "Datetime",
+            "label": "Timestamp"
+        },
+        {
+            "fieldname": "media_url",
+            "fieldtype": "Data",
+            "label": "Media URL"
+        },
+        {
+            "default": "0",
+            "fieldname": "is_bot_message",
+            "fieldtype": "Check",
+            "label": "Is Bot Message"
+        },
+        {
+            "fieldname": "section_break_11",
+            "fieldtype": "Section Break",
+            "label": "CRM Links"
+        },
+        {
+            "fieldname": "lead",
+            "fieldtype": "Link",
+            "label": "Lead",
+            "options": "Lead"
+        },
+        {
+            "fieldname": "contact",
+            "fieldtype": "Link", 
+            "label": "Contact",
+            "options": "Contact"
+        },
+        {
+            "fieldname": "customer",
+            "fieldtype": "Link",
+            "label": "Customer", 
+            "options": "Customer"
+        }
+    ],
+    "index_web_pages_for_search": 1,
+    "links": [],
+    "modified": "2024-09-12 10:22:00.000000",
+    "modified_by": "Administrator",
+    "module": "WhatsApp Calling",
+    "name": "WhatsApp Message",
+    "naming_rule": "By fieldname",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "export": 1,
+            "print": 1,
+            "read": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        },
+        {
+            "read": 1,
+            "role": "Sales User"
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 1
+}

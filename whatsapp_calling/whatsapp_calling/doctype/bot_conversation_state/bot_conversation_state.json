@@ -1,0 +1,125 @@
+{
+    "actions": [],
+    "allow_rename": 1,
+    "creation": "2024-09-12 10:22:00.000000",
+    "default_view": "List",
+    "doctype": "DocType",
+    "editable_grid": 1,
+    "engine": "InnoDB",
+    "field_order": [
+        "conversation_id",
+        "phone_number",
+        "current_intent", 
+        "context_data",
+        "lead_score",
+        "language",
+        "column_break_6",
+        "last_interaction",
+        "is_active",
+        "is_escalated",
+        "escalated_at",
+        "escalated_reason"
+    ],
+    "fields": [
+        {
+            "fieldname": "conversation_id",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "Conversation ID",
+            "reqd": 1,
+            "unique": 1
+        },
+        {
+            "fieldname": "phone_number",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "Phone Number",
+            "reqd": 1
+        },
+        {
+            "fieldname": "current_intent",
+            "fieldtype": "Select",
+            "label": "Current Intent", 
+            "options": "greeting\\nproduct_inquiry\\npricing\\nsupport\\nappointment\\ncomplaint\\nlead_qualification\\ngoodbye\\nother",
+            "default": "greeting"
+        },
+        {
+            "fieldname": "context_data",
+            "fieldtype": "JSON",
+            "label": "Context Data"
+        },
+        {
+            "default": "0",
+            "fieldname": "lead_score",
+            "fieldtype": "Int",
+            "label": "Lead Score"
+        },
+        {
+            "default": "en",
+            "fieldname": "language",
+            "fieldtype": "Select",
+            "label": "Language",
+            "options": "en\\nhi\\nregional"
+        },
+        {
+            "fieldname": "column_break_6",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "last_interaction",
+            "fieldtype": "Datetime",
+            "label": "Last Interaction"
+        },
+        {
+            "default": "1",
+            "fieldname": "is_active",
+            "fieldtype": "Check",
+            "label": "Is Active"
+        },
+        {
+            "default": "0", 
+            "fieldname": "is_escalated",
+            "fieldtype": "Check",
+            "label": "Is Escalated"
+        },
+        {
+            "fieldname": "escalated_at",
+            "fieldtype": "Datetime",
+            "label": "Escalated At"
+        },
+        {
+            "fieldname": "escalated_reason",
+            "fieldtype": "Data",
+            "label": "Escalated Reason"
+        }
+    ],
+    "index_web_pages_for_search": 1,
+    "links": [],
+    "modified": "2024-09-12 10:22:00.000000",
+    "modified_by": "Administrator",
+    "module": "WhatsApp Calling",
+    "name": "Bot Conversation State",
+    "naming_rule": "By fieldname", 
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "export": 1,
+            "print": 1,
+            "read": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        },
+        {
+            "read": 1,
+            "role": "Sales User"
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 1
+}

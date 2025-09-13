@@ -15,7 +15,7 @@ with open("requirements.txt", "r") as f:
 
 setup(
     name="whatsapp_calling",
-    version=get_version(),
+    version="1.0.1",
     description="WebRTC voice calling integration with WhatsApp Business API for FrappeCRM",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",

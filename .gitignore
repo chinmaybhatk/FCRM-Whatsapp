@@ -1,0 +1,34 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node.js dependencies (should not be in Frappe app root)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Frappe specific
+*.compiled
+sites/
+
+# MediaSoup server should be deployed separately
+# Only exclude from root, allow in mediasoup-server/ directory
+/package.json
+/server.js
+/mediasoup-signaling-server.js

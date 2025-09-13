@@ -1,8 +1,37 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.bench.dev-dependencies]
-coverage = "~6.5.0"
-Faker = "~13.12.1"
-pyyaml = "~5.4.1"
+[project]
+name = "whatsapp_calling"
+version = "1.0.1"
+description = "WebRTC voice calling integration with WhatsApp Business API for FrappeCRM"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "FrappeCRM", email = "admin@frappecrm.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers", 
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Framework :: Frappe",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "frappe>=15.0.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/chinmaybhatk/FCRM-Whatsapp"
+Repository = "https://github.com/chinmaybhatk/FCRM-Whatsapp"
+Documentation = "https://github.com/chinmaybhatk/FCRM-Whatsapp#readme"
+"Bug Tracker" = "https://github.com/chinmaybhatk/FCRM-Whatsapp/issues"
+
+[tool.setuptools.packages.find]
+include = ["whatsapp_calling*"]

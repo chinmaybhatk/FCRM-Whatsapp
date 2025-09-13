@@ -15,4 +15,4 @@ This app provides:
 Compatible with Frappe v14+ and designed for production deployment.
 """
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'

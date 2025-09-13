@@ -57,16 +57,17 @@ The solution follows a microservices architecture with these key components:
 ### External Services
 - **WhatsApp Business API**: Official Meta integration
 - **Claude 3.5 Sonnet**: Superior conversational AI
-- **Valve WebRTC Gateway**: Proven voice infrastructure
+- **MediaSoup WebRTC SFU**: High-performance WebRTC infrastructure
 
 ## Installation
 
 ### Prerequisites
-- Frappe Framework v14+
-- Python 3.9+
+- Frappe Framework v15+
+- Python 3.8+
 - Node.js 16+
 - Redis 6+
 - WhatsApp Business Account
+- MediaSoup server (for WebRTC calling)
 
 ### Step 1: Install the App
 ```bash
@@ -87,10 +88,195 @@ bench install-app whatsapp_calling
    - Access Token
    - Webhook Verify Token
 
-### Step 3: Setup Valve WebRTC Gateway
-1. Configure Valve WebRTC settings
-2. Add API credentials and endpoints
-3. Setup ICE servers for WebRTC
+### Step 3: Setup MediaSoup WebRTC Server
+
+#### 3.1 Install MediaSoup Server
+```bash
+# Create a new directory for MediaSoup server
+mkdir mediasoup-server
+cd mediasoup-server
+
+# Initialize npm project
+npm init -y
+
+# Install MediaSoup
+npm install mediasoup@3
+npm install socket.io@4
+npm install express@4
+```
+
+#### 3.2 Create MediaSoup Server
+Create `server.js`:
+```javascript
+const mediasoup = require('mediasoup');
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+let worker;
+let router;
+let transports = {};
+let producers = {};
+let consumers = {};
+
+async function createWorker() {
+  worker = await mediasoup.createWorker({
+    logLevel: 'warn',
+    rtcMinPort: 10000,
+    rtcMaxPort: 10100,
+  });
+
+  console.log('MediaSoup worker created');
+
+  worker.on('died', error => {
+    console.error('MediaSoup worker died', error);
+    setTimeout(() => process.exit(1), 2000);
+  });
+
+  return worker;
+}
+
+async function createRouter() {
+  const mediaCodecs = [
+    {
+      kind: 'audio',
+      mimeType: 'audio/opus',
+      clockRate: 48000,
+      channels: 2,
+    },
+    {
+      kind: 'audio',
+      mimeType: 'audio/PCMU',
+      clockRate: 8000,
+    },
+  ];
+
+  router = await worker.createRouter({ mediaCodecs });
+  console.log('MediaSoup router created');
+  return router;
+}
+
+async function init() {
+  await createWorker();
+  await createRouter();
+
+  server.listen(3000, () => {
+    console.log('MediaSoup server listening on port 3000');
+  });
+}
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+
+  socket.on('get-rtp-capabilities', (callback) => {
+    callback(router.rtpCapabilities);
+  });
+
+  socket.on('create-transport', async (data, callback) => {
+    try {
+      const transport = await router.createWebRtcTransport({
+        listenIps: [{ ip: '0.0.0.0', announcedIp: null }],
+        enableUdp: true,
+        enableTcp: true,
+        preferUdp: true,
+      });
+
+      transports[transport.id] = transport;
+
+      callback({
+        id: transport.id,
+        iceParameters: transport.iceParameters,
+        iceCandidates: transport.iceCandidates,
+        dtlsParameters: transport.dtlsParameters,
+      });
+    } catch (error) {
+      console.error('Error creating transport:', error);
+      callback({ error: error.message });
+    }
+  });
+
+  socket.on('transport-connect', async (data) => {
+    const { transportId, dtlsParameters } = data;
+    const transport = transports[transportId];
+    if (transport) {
+      await transport.connect({ dtlsParameters });
+    }
+  });
+
+  socket.on('transport-produce', async (data, callback) => {
+    const { transportId, kind, rtpParameters, appData } = data;
+    const transport = transports[transportId];
+    
+    if (transport) {
+      const producer = await transport.produce({
+        kind,
+        rtpParameters,
+        appData,
+      });
+
+      producers[producer.id] = producer;
+      callback({ id: producer.id });
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});
+
+init().catch(console.error);
+```
+
+#### 3.3 Start MediaSoup Server
+```bash
+# Start the server
+node server.js
+```
+
+#### 3.4 Configure MediaSoup WebRTC Settings in Frappe
+1. Go to **MediaSoup WebRTC Settings** in Frappe
+2. Configure the following:
+   - **Server Host**: `127.0.0.1` (or your server IP)
+   - **Server Port**: `3000`
+   - **RTC Min Port**: `10000`
+   - **RTC Max Port**: `10100`
+   - **Worker Pool Size**: `1`
+   - **ICE Servers**: Add STUN/TURN servers
+   - **Audio Codec Preferences**: Configure Opus and PCMU codecs
+3. Enable the MediaSoup WebRTC integration
+4. Test the connection using the status check API
+
+#### 3.5 Production Deployment
+For production, consider:
+- Running MediaSoup server with PM2 or Docker
+- Using a reverse proxy (nginx) for WebSocket connections
+- Configuring proper SSL certificates
+- Setting up monitoring and logging
+
+#### 3.6 MediaSoup Documentation & Resources
+- 📚 [MediaSoup v3 Documentation](https://mediasoup.org/documentation/v3/)
+- 🚀 [MediaSoup Installation Guide](https://mediasoup.org/documentation/v3/mediasoup/installation/)
+- 🔧 [MediaSoup API Reference](https://mediasoup.org/documentation/v3/mediasoup/api/)
+- 🎯 [MediaSoup Client Library](https://mediasoup.org/documentation/v3/mediasoup-client/api/)
+- 💡 [MediaSoup Examples](https://github.com/versatica/mediasoup/tree/v3/examples)
+- 🐛 [MediaSoup GitHub Issues](https://github.com/versatica/mediasoup/issues)
+
+#### 3.7 Troubleshooting MediaSoup
+Common issues and solutions:
+- **Port binding errors**: Ensure RTC ports (10000-10100) are available
+- **Worker creation failures**: Check system resources and permissions
+- **Connection timeouts**: Verify firewall and network configuration
+- **Audio codec issues**: Confirm Opus support in browser
 
 ### Step 4: Configure AI Bot (Optional)
 1. Add Claude API key or OpenAI key
@@ -103,7 +289,8 @@ bench install-app whatsapp_calling
 1. Open any Lead, Contact, or Customer record
 2. Click the **Call** button in Communication section
 3. Browser will request microphone permissions
-4. Call will be initiated through WebRTC to WhatsApp
+4. MediaSoup client will establish WebRTC connection
+5. Call will be initiated through MediaSoup SFU to WhatsApp
 
 ### Managing Conversations
 1. Click **WhatsApp** button to open conversation dialog
@@ -142,8 +329,11 @@ POST /api/method/whatsapp_calling.calling.webrtc_manager.end_call
     "end_reason": "user_hangup"
 }
 
-# Get call token
-GET /api/method/whatsapp_calling.calling.webrtc_manager.get_call_token
+# Get MediaSoup configuration
+GET /api/method/whatsapp_calling.whatsapp_calling.doctype.mediasoup_webrtc_settings.api.get_mediasoup_config
+
+# Check MediaSoup status
+GET /api/method/whatsapp_calling.whatsapp_calling.doctype.mediasoup_webrtc_settings.api.check_mediasoup_status
 ```
 
 ### Bot Management APIs
@@ -162,6 +352,39 @@ POST /api/method/whatsapp_calling.bot.ai_engine.escalate_conversation
 POST /api/method/whatsapp_calling.whatsapp_integration.webhook_handler.whatsapp_webhook
 ```
 
+## MediaSoup Configuration
+
+### MediaSoup WebRTC Settings
+Configure the following in Frappe:
+
+```json
+{
+  "server_host": "127.0.0.1",
+  "server_port": 3000,
+  "rtc_min_port": 10000,
+  "rtc_max_port": 10100,
+  "worker_pool_size": 1,
+  "ice_servers": [
+    {"urls": "stun:stun.l.google.com:19302"},
+    {"urls": "stun:stun1.l.google.com:19302"}
+  ],
+  "codec_preferences": [
+    {
+      "kind": "audio",
+      "mimeType": "audio/opus",
+      "clockRate": 48000,
+      "channels": 2
+    }
+  ]
+}
+```
+
+### Firewall Configuration
+Ensure these ports are open:
+- **3000**: MediaSoup server port
+- **10000-10100**: RTC media ports
+- **443/80**: HTTPS/HTTP for signaling
+
 ## Configuration
 
 ### Performance Requirements (NFR-001)
@@ -172,7 +395,7 @@ POST /api/method/whatsapp_calling.whatsapp_integration.webhook_handler.whatsapp_
 
 ### Scalability (NFR-002)
 - Support 10,000+ concurrent WhatsApp sessions ✅
-- Handle 1,000+ simultaneous calls ✅
+- Handle 1,000+ simultaneous calls via MediaSoup SFU ✅
 - Process 100,000+ messages/day ✅
 - Multi-tenant architecture ✅
 
@@ -251,10 +474,12 @@ services:
 - Performance tracking ✅
 
 ### Call Quality Monitoring
-- MOS (Mean Opinion Score) ✅
+- MediaSoup transport statistics ✅
+- Producer/Consumer metrics ✅
 - Packet loss tracking ✅
 - Latency measurement ✅
 - Jitter analysis ✅
+- Audio codec performance (Opus/PCMU) ✅
 
 ## Support
 
@@ -297,10 +522,23 @@ MIT License - see LICENSE file for details.
 
 ## Support & Documentation
 
+### Project Documentation
 - 📚 [Full Documentation](https://docs.frappecrm.com/whatsapp-calling)
 - 💬 [Community Forum](https://discuss.frappecrm.com)
 - 🐛 [Report Issues](https://github.com/chinmaybhatk/FCRM-Whatsapp/issues)
 - 📧 [Email Support](mailto:support@frappecrm.com)
+
+### MediaSoup Resources
+- 🎯 [MediaSoup Official Site](https://mediasoup.org/)
+- 📖 [MediaSoup v3 Documentation](https://mediasoup.org/documentation/v3/)
+- 🚀 [MediaSoup GitHub Repository](https://github.com/versatica/mediasoup)
+- 💡 [MediaSoup Examples & Demos](https://github.com/versatica/mediasoup-demo)
+- 🔧 [MediaSoup Client API](https://mediasoup.org/documentation/v3/mediasoup-client/api/)
+
+### Frappe Framework Resources
+- 📚 [Frappe Framework Documentation](https://frappeframework.com/docs)
+- 🎓 [Frappe School](https://frappe.school/)
+- 💬 [Frappe Community](https://discuss.frappe.io/)
 
 ---
 

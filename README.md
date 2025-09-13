@@ -92,155 +92,31 @@ bench install-app whatsapp_calling
 
 #### 3.1 Install MediaSoup Server
 ```bash
-# Create a new directory for MediaSoup server
-mkdir mediasoup-server
+# Navigate to the MediaSoup server directory
 cd mediasoup-server
 
-# Initialize npm project
-npm init -y
-
-# Install MediaSoup
-npm install mediasoup@3
-npm install socket.io@4
-npm install express@4
+# Install dependencies (requires Node.js >= 20)
+npm install
 ```
 
-#### 3.2 Create MediaSoup Server
-Create `server.js`:
-```javascript
-const mediasoup = require('mediasoup');
-const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
+**Note**: The MediaSoup server is provided in the `mediasoup-server/` directory and must be deployed separately from the Frappe app due to Node.js version requirements.
 
-const app = express();
-const server = http.createServer(app);
-const io = socketIo(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
-});
+#### 3.2 Run MediaSoup Server
+The server code is already provided in `mediasoup-server/server.js`. To start it:
 
-let worker;
-let router;
-let transports = {};
-let producers = {};
-let consumers = {};
-
-async function createWorker() {
-  worker = await mediasoup.createWorker({
-    logLevel: 'warn',
-    rtcMinPort: 10000,
-    rtcMaxPort: 10100,
-  });
-
-  console.log('MediaSoup worker created');
-
-  worker.on('died', error => {
-    console.error('MediaSoup worker died', error);
-    setTimeout(() => process.exit(1), 2000);
-  });
-
-  return worker;
-}
-
-async function createRouter() {
-  const mediaCodecs = [
-    {
-      kind: 'audio',
-      mimeType: 'audio/opus',
-      clockRate: 48000,
-      channels: 2,
-    },
-    {
-      kind: 'audio',
-      mimeType: 'audio/PCMU',
-      clockRate: 8000,
-    },
-  ];
-
-  router = await worker.createRouter({ mediaCodecs });
-  console.log('MediaSoup router created');
-  return router;
-}
-
-async function init() {
-  await createWorker();
-  await createRouter();
-
-  server.listen(3000, () => {
-    console.log('MediaSoup server listening on port 3000');
-  });
-}
-
-// Socket.IO connection handling
-io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
-
-  socket.on('get-rtp-capabilities', (callback) => {
-    callback(router.rtpCapabilities);
-  });
-
-  socket.on('create-transport', async (data, callback) => {
-    try {
-      const transport = await router.createWebRtcTransport({
-        listenIps: [{ ip: '0.0.0.0', announcedIp: null }],
-        enableUdp: true,
-        enableTcp: true,
-        preferUdp: true,
-      });
-
-      transports[transport.id] = transport;
-
-      callback({
-        id: transport.id,
-        iceParameters: transport.iceParameters,
-        iceCandidates: transport.iceCandidates,
-        dtlsParameters: transport.dtlsParameters,
-      });
-    } catch (error) {
-      console.error('Error creating transport:', error);
-      callback({ error: error.message });
-    }
-  });
-
-  socket.on('transport-connect', async (data) => {
-    const { transportId, dtlsParameters } = data;
-    const transport = transports[transportId];
-    if (transport) {
-      await transport.connect({ dtlsParameters });
-    }
-  });
-
-  socket.on('transport-produce', async (data, callback) => {
-    const { transportId, kind, rtpParameters, appData } = data;
-    const transport = transports[transportId];
-    
-    if (transport) {
-      const producer = await transport.produce({
-        kind,
-        rtpParameters,
-        appData,
-      });
-
-      producers[producer.id] = producer;
-      callback({ id: producer.id });
-    }
-  });
-
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
-  });
-});
-
-init().catch(console.error);
-```
-
-#### 3.3 Start MediaSoup Server
 ```bash
+# Set environment variables
+export FRAPPE_URL="https://your-frappe-site.com"
+export PORT=3000
+
 # Start the server
-node server.js
+npm start
+```
+
+#### 3.3 Verify MediaSoup Server
+```bash
+# Check server health
+curl http://localhost:3000/health
 ```
 
 #### 3.4 Configure MediaSoup WebRTC Settings in Frappe

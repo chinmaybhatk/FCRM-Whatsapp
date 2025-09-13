@@ -1,0 +1,32 @@
+{
+  "name": "whatsapp-calling-mediasoup",
+  "version": "1.0.0",
+  "description": "MediaSoup signaling server for Frappe WhatsApp Calling",
+  "main": "mediasoup-signaling-server.js",
+  "scripts": {
+    "start": "node mediasoup-signaling-server.js",
+    "dev": "nodemon mediasoup-signaling-server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "mediasoup",
+    "webrtc",
+    "frappe",
+    "whatsapp",
+    "calling"
+  ],
+  "author": "FrappeCRM",
+  "license": "MIT",
+  "dependencies": {
+    "mediasoup": "^3.14.0",
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "axios": "^1.5.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

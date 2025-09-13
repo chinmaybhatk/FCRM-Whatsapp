@@ -254,3 +254,29 @@ def get_ice_servers():
     """API endpoint to get ICE servers configuration"""
     manager = WebRTCManager()
     return manager.get_ice_servers()
+
+
+@frappe.whitelist()
+def validate_session(session_token, user_id):
+    """Validate session for MediaSoup signaling server"""
+    try:
+        # Decode JWT token
+        payload = jwt.decode(
+            session_token, 
+            "mediasoup-" + frappe.generate_hash(length=16), 
+            algorithms=["HS256"]
+        )
+        
+        # Check if user matches and token is not expired
+        if payload.get("sub") == user_id:
+            return {"valid": True, "user": user_id}
+        else:
+            return {"valid": False, "error": "User mismatch"}
+            
+    except jwt.ExpiredSignatureError:
+        return {"valid": False, "error": "Token expired"}
+    except jwt.InvalidTokenError:
+        return {"valid": False, "error": "Invalid token"}
+    except Exception as e:
+        frappe.logger().error(f"Session validation error: {str(e)}")
+        return {"valid": False, "error": "Validation failed"}

@@ -1,7 +1,7 @@
 class WhatsAppWebRTCClient {
     constructor() {
         this.device = null;
-        this.socket = io('/whatsapp-calling');
+        this.socket = null;
         this.currentCall = null;
         this.isCallActive = false;
         this.localStream = null;
@@ -10,8 +10,8 @@ class WhatsAppWebRTCClient {
         this.producer = null;
         this.consumer = null;
         this.mediasoupConfig = null;
+        this.isAuthenticated = false;
         
-        this.bindEvents();
         this.initMediaSoup();
     }
     
@@ -76,15 +76,18 @@ class WhatsAppWebRTCClient {
     
     async setupMediaSoupConnection() {
         try {
-            // Get MediaSoup configuration from server
+            // Get MediaSoup configuration from Frappe
             const response = await frappe.call({
                 method: 'whatsapp_calling.whatsapp_calling.doctype.mediasoup_webrtc_settings.api.get_mediasoup_config'
             });
             
             this.mediasoupConfig = response.message;
             
-            // Get router RTP capabilities from server
-            const rtpCapabilities = await this.getRtpCapabilities();
+            // Connect to MediaSoup signaling server
+            await this.connectToSignalingServer();
+            
+            // Get router RTP capabilities from signaling server
+            const rtpCapabilities = await this.getRtpCapabilitiesFromServer();
             
             // Load the device with RTP capabilities
             if (!this.device.loaded) {
@@ -96,6 +99,74 @@ class WhatsAppWebRTCClient {
             console.error('Error setting up MediaSoup:', error);
             this.showError('Failed to setup call connection');
         }
+    }
+    
+    async connectToSignalingServer() {
+        return new Promise((resolve, reject) => {
+            const signalingUrl = `ws://${this.mediasoupConfig.server_host}:${this.mediasoupConfig.server_port}`;
+            
+            // Connect to signaling server
+            this.socket = io(signalingUrl, {
+                transports: ['websocket']
+            });
+            
+            this.socket.on('connect', async () => {
+                console.log('Connected to MediaSoup signaling server');
+                
+                // Authenticate with Frappe session
+                const sessionToken = await this.getSessionToken();
+                
+                this.socket.emit('authenticate', {
+                    sessionToken: sessionToken,
+                    userId: frappe.session.user
+                }, (response) => {
+                    if (response.success) {
+                        this.isAuthenticated = true;
+                        this.bindEvents();
+                        resolve();
+                    } else {
+                        reject(new Error('Authentication failed: ' + response.error));
+                    }
+                });
+            });
+            
+            this.socket.on('connect_error', (error) => {
+                console.error('Signaling server connection error:', error);
+                reject(error);
+            });
+        });
+    }
+    
+    async getSessionToken() {
+        try {
+            const response = await frappe.call({
+                method: 'whatsapp_calling.calling.webrtc_manager.get_call_token',
+                args: {
+                    session_id: this.currentCall?.session_id || frappe.utils.get_random(10),
+                }
+            });
+            return response.message;
+        } catch (error) {
+            console.error('Error getting session token:', error);
+            return null;
+        }
+    }
+    
+    async getRtpCapabilitiesFromServer() {
+        return new Promise((resolve, reject) => {
+            if (!this.isAuthenticated) {
+                reject(new Error('Not authenticated with signaling server'));
+                return;
+            }
+            
+            this.socket.emit('get-rtp-capabilities', (rtpCapabilities) => {
+                if (rtpCapabilities.error) {
+                    reject(new Error(rtpCapabilities.error));
+                } else {
+                    resolve(rtpCapabilities);
+                }
+            });
+        });
     }
     
     async getRtpCapabilities() {

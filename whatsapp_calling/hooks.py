@@ -61,6 +61,9 @@ scheduler_events = {
     ]
 }
 
+# Installation
+after_install = "whatsapp_calling.install.after_install"
+
 # Testing
 before_tests = "whatsapp_calling.install.before_tests"
 
